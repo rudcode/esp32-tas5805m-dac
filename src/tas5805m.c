@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #include "../eq/tas5805m_eq.h"
-#include "driver/i2c.h"
+#include "driver/i2c_master.h"
 #include "esp_log.h"
 #include "tas5805m_cfg.h"
 
@@ -73,88 +73,97 @@ TAS5805_STATE tas5805m_state = {
     .mixer_mode = MIXER_UNKNOWN,  // todo: can be redefined in startup sequence
 };
 
+static i2c_master_dev_handle_t s_tas5805m_i2c_dev_handle = NULL;
+
 /* Helper Functions */
+// Set the I2C device handle
+esp_err_t tas5805m_set_i2c_device_handle(i2c_master_dev_handle_t handle) {
+  if (handle == NULL) {
+    ESP_LOGE(TAG, "%s: Provided I2C device handle is NULL", __func__);
+    return ESP_ERR_INVALID_ARG;
+  }
+  s_tas5805m_i2c_dev_handle = handle;
+  return ESP_OK;
+}
+
 // Reading of TAS5805M-Register
 esp_err_t tas5805m_read_byte(uint8_t register_name, uint8_t *data) {
-  int ret;
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, TAS5805M_ADDRESS << 1 | WRITE_BIT, ACK_CHECK_EN);
-  i2c_master_write_byte(cmd, register_name, ACK_CHECK_EN);
-  i2c_master_stop(cmd);
-  ret = i2c_master_cmd_begin(I2C_TAS5805M_MASTER_NUM, cmd,
-                             1000 / portTICK_RATE_MS);
-  i2c_cmd_link_delete(cmd);
-
-  if (ret != ESP_OK) {
-    ESP_LOGW(TAG, "%s: I2C error %s", __func__, esp_err_to_name(ret));
+  if (s_tas5805m_i2c_dev_handle == NULL) {
+    ESP_LOGE(TAG,
+             "%s: I2C device handle not set. Call "
+             "tas5805m_set_i2c_device_handle first.",
+             __func__);
+    return ESP_ERR_INVALID_STATE;
   }
 
-  vTaskDelay(1 / portTICK_RATE_MS);
-  cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, TAS5805M_ADDRESS << 1 | READ_BIT, ACK_CHECK_EN);
-  i2c_master_read_byte(cmd, data, NACK_VAL);
-  i2c_master_stop(cmd);
-  ret = i2c_master_cmd_begin(I2C_TAS5805M_MASTER_NUM, cmd,
-                             1000 / portTICK_RATE_MS);
-  i2c_cmd_link_delete(cmd);
+  esp_err_t ret = i2c_master_transmit_receive(s_tas5805m_i2c_dev_handle,
+                                              &register_name, 1, data, 1, 1000);
 
-  ESP_LOGV(TAG, "%s: 0x%02x = 0x%02x", __func__, register_name, *data);
-
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "%s: Failed to read register 0x%02x: %s", __func__,
+             register_name, esp_err_to_name(ret));
+  } else {
+    ESP_LOGV(TAG, "%s: 0x%02x = 0x%02x", __func__, register_name, *data);
+  }
   return ret;
 }
 
 // Writing of TAS5805M-Register
 esp_err_t tas5805m_write_byte(uint8_t register_name, uint8_t value) {
-  ESP_LOGV(TAG, "%s: 0x%02x <- 0x%02x", __func__, register_name, value);
-  int ret = 0;
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  i2c_master_start(cmd);
-  i2c_master_write_byte(cmd, TAS5805M_ADDRESS << 1 | WRITE_BIT, ACK_CHECK_EN);
-  i2c_master_write_byte(cmd, register_name, ACK_CHECK_EN);
-  i2c_master_write_byte(cmd, value, ACK_CHECK_EN);
-  i2c_master_stop(cmd);
-
-  ret = i2c_master_cmd_begin(I2C_TAS5805M_MASTER_NUM, cmd,
-                             1000 / portTICK_RATE_MS);
-
-  // Check if ret is OK
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "%s: error during I2C transmission: %s", __func__,
-             esp_err_to_name(ret));
+  if (s_tas5805m_i2c_dev_handle == NULL) {
+    ESP_LOGE(TAG,
+             "%s: I2C device handle not set. Call "
+             "tas5805m_set_i2c_device_handle first.",
+             __func__);
+    return ESP_ERR_INVALID_STATE;
   }
 
-  i2c_cmd_link_delete(cmd);
+  ESP_LOGV(TAG, "%s: 0x%02x <- 0x%02x", __func__, register_name, value);
+  esp_err_t ret;
+  uint8_t write_buffer[2];
+  write_buffer[0] = register_name;
+  write_buffer[1] = value;
 
+  // Transmit the register address followed by the data byte
+  ret = i2c_master_transmit(s_tas5805m_i2c_dev_handle, write_buffer,
+                            sizeof(write_buffer), 1000);
+
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "%s: Error during I2C transmission to 0x%02x: %s", __func__,
+             register_name, esp_err_to_name(ret));
+  }
   return ret;
 }
 
 esp_err_t tas5805m_write_bytes(uint8_t *reg, int regLen, uint8_t *data,
                                int datalen) {
-  int ret = ESP_OK;
+  if (s_tas5805m_i2c_dev_handle == NULL) {
+    ESP_LOGE(TAG,
+             "%s: I2C device handle not set. Call "
+             "tas5805m_set_i2c_device_handle first.",
+             __func__);
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  esp_err_t ret = ESP_OK;
   ESP_LOGV(TAG, "%s: 0x%02x <- [%d] bytes", __func__, *reg, datalen);
   for (int i = 0; i < datalen; i++) {
     ESP_LOGV(TAG, "%s: 0x%02x", __func__, data[i]);
   }
 
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-  ret |= i2c_master_start(cmd);
-  ret |= i2c_master_write_byte(cmd, TAS5805M_ADDRESS << 1 | WRITE_BIT,
-                               ACK_CHECK_EN);
-  ret |= i2c_master_write(cmd, reg, regLen, ACK_CHECK_EN);
-  ret |= i2c_master_write(cmd, data, datalen, ACK_CHECK_EN);
-  ret |= i2c_master_stop(cmd);
-  ret = i2c_master_cmd_begin(I2C_TAS5805M_MASTER_NUM, cmd,
-                             1000 / portTICK_RATE_MS);
+  i2c_master_transmit_multi_buffer_info_t bufs[2];
+  bufs[0].write_buffer = reg;
+  bufs[0].buffer_size = regLen;
+  bufs[1].write_buffer = data;
+  bufs[1].buffer_size = datalen;
 
-  // Check if ret is OK
+  ret = i2c_master_multi_buffer_transmit(s_tas5805m_i2c_dev_handle, bufs, 2,
+                                         1000);  // Timeout in ms
+
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "%s: Error during I2C transmission: %s", __func__,
-             esp_err_to_name(ret));
+    ESP_LOGE(TAG, "%s: Error during I2C multi-buffer transmission: %s",
+             __func__, esp_err_to_name(ret));
   }
-
-  i2c_cmd_link_delete(cmd);
 
   return ret;
 }

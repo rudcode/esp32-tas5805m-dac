@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Wire.h>
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -9,6 +8,8 @@
 #include <unistd.h>
 // #include "freertos/FreeRTOS.h"
 // #include "freertos/task.h"
+#include <driver/i2c_types.h>
+
 #include "esp_system.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -17,11 +18,10 @@
 #include "esp_log.h"
 #include "tas5805m.h"
 class tas5805m {
- private:
-  TwoWire *wire;
-
  public:
-  tas5805m(TwoWire *wire) : wire(wire) {};
+  esp_err_t setI2cDeviceHandle(i2c_master_dev_handle_t handle) {
+    return tas5805m_set_i2c_device_handle(handle);
+  }
 
   esp_err_t deinit() { return tas5805m_deinit(); }
 

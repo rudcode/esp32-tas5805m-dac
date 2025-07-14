@@ -1,6 +1,7 @@
 #ifndef _TAS5805M_H_
 #define _TAS5805M_H_
 
+#include <driver/i2c_types.h>
 #include <stdbool.h>
 
 #include "../eq/tas5805m_eq.h"
@@ -133,6 +134,16 @@ static const uint8_t tas5805m_again[TAS5805M_MIN_GAIN + 1] = {
 #define TAS5805M_VOLUME_PCT_DEFAULT 100  //  +0 Db
 #define TAS5805M_VOLUME_PCT_MAX 124      // +24 Db
 
+/**
+ * @brief Set I2C device handle
+ *
+ * @param handle i2c_master_dev_handle_t
+ *
+ * @return
+ *     - ESP_OK
+ *     - ESP_FAIL
+ */
+esp_err_t tas5805m_set_i2c_device_handle(i2c_master_dev_handle_t handle);
 /**
  * @brief Power up and initialize TAS5805 codec chip
  *
