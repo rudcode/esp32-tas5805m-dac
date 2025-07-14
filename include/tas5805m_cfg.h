@@ -1,21 +1,21 @@
 #pragma once
 
-#include "driver/i2s.h" 
+#include "driver/i2s.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 /* Register Naming*/
 #define WRITE_BIT I2C_MASTER_WRITE /*!< I2C master write */
 #define READ_BIT I2C_MASTER_READ   /*!< I2C master read */
 #define ACK_CHECK_EN 0x1           /*!< I2C master will check ack from slave*/
-#define ACK_CHECK_DIS 0x0          /*!< I2C master will not check ack from slave */
-#define ACK_VAL I2C_MASTER_ACK     /*!< I2C ack value */
-#define NACK_VAL I2C_MASTER_NACK   /*!< I2C nack value */
+#define ACK_CHECK_DIS 0x0      /*!< I2C master will not check ack from slave */
+#define ACK_VAL I2C_MASTER_ACK /*!< I2C ack value */
+#define NACK_VAL I2C_MASTER_NACK /*!< I2C nack value */
 
-#define TAS5805M_ADDRESS 0x2D      /*!< 7-bit address with a 15k pull up resistor */
+#define TAS5805M_ADDRESS 0x2D /*!< 7-bit address with a 15k pull up resistor \
+                               */
 
 #if CONFIG_IDF_TARGET_ESP32C3
 #define GPIO_NUM_UNSET 63
@@ -131,7 +131,7 @@ extern "C"
 #define TAS5805M_REG_RIGHT_VOLUME 0x28
 #define TAS5805M_MIXER_VALUE_MUTE 0x00
 #define TAS5805M_MIXER_VALUE_0DB 0x00008000
-#define TAS5805M_MIXER_VALUE_MINUS6DB 0xE7264000  
+#define TAS5805M_MIXER_VALUE_MINUS6DB 0xE7264000
 
 #ifdef __cplusplus
 }
